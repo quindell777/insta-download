@@ -67,10 +67,7 @@ def download_instagram_video(url):
     
     # ###################### INÍCIO DA CORREÇÃO ######################
     # Substituído PostNotExistsException pela exceção correta: NotFoundException
-    except instaloader.exceptions.NotFoundException:
-        st.error("O post não existe ou foi removido (Erro 404). Por favor, verifique a URL.")
-        return None
-    # ####################### FIM DA CORREÇÃO ########################
+   ####### FIM DA CORREÇÃO ########################
     
     except Exception as e:
         st.error(f"Ocorreu um erro inesperado ao baixar o vídeo: {e}")
