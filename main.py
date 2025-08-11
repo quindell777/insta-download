@@ -12,8 +12,34 @@ DOWNLOAD_DIR = "instagram_downloads"
 if not os.path.exists(DOWNLOAD_DIR):
     os.makedirs(DOWNLOAD_DIR)
 
+# ###################### INÍCIO DA CORREÇÃO DE LOGIN ######################
 # Inicializa o Instaloader
 L = instaloader.Instaloader()
+
+# Tenta fazer login usando variáveis de ambiente
+INSTA_USER = os.environ.get("INSTAGRAM_USER")
+INSTA_PASS = os.environ.get("INSTAGRAM_PASSWORD")
+
+# Use um placeholder no session_state para evitar logins repetidos
+if 'insta_logged_in' not in st.session_state:
+    st.session_state['insta_logged_in'] = False
+
+if INSTA_USER and INSTA_PASS and not st.session_state['insta_logged_in']:
+    try:
+        st.sidebar.info(f"Tentando login como {INSTA_USER}...")
+        L.login(INSTA_USER, INSTA_PASS)
+        st.session_state['insta_logged_in'] = True
+        st.sidebar.success(f"Login no Instagram realizado com sucesso como {INSTA_USER}!")
+    except Exception as e:
+        st.sidebar.error(f"Falha no login do Instagram: {e}")
+        st.sidebar.warning("A aplicação continuará em modo anônimo (sujeito a bloqueios).")
+        st.session_state['insta_logged_in'] = False # Garante que não tente novamente
+else:
+    if not st.session_state.get('warned_anonymous', False):
+        st.sidebar.warning("Nenhuma credencial do Instagram encontrada. A aplicação está rodando em modo anônimo e pode ser bloqueada facilmente pelo Instagram.")
+        st.session_state['warned_anonymous'] = True
+# ####################### FIM DA CORREÇÃO DE LOGIN ########################
+
 
 # --- Funções Auxiliares ---
 
@@ -45,7 +71,7 @@ def download_instagram_video(url):
 
         L.dirname_pattern = DOWNLOAD_DIR
         L.filename_pattern = "{profile}_{shortcode}"
-        L.download_post(post, target=DOWNLOAD_DIR)
+        L.download_post(post, target=f"./{DOWNLOAD_DIR}") # Alvo explícito
 
         video_filename = None
         for f in os.listdir(DOWNLOAD_DIR):
@@ -62,16 +88,17 @@ def download_instagram_video(url):
             return None
 
     except instaloader.exceptions.PrivateProfileNotFollowedException:
-        st.error("Este é um perfil privado e você não o segue. O Instaloader precisa de credenciais para baixar de perfis privados.")
+        st.error("Este é um perfil privado e você não o segue. O Instaloader precisa estar logado na sua conta para baixar.")
         return None
-    
-    # ###################### INÍCIO DA CORREÇÃO ######################
-    # Substituído PostNotExistsException pela exceção correta: NotFoundException
-   ####### FIM DA CORREÇÃO ########################
-    
+    except instaloader.exceptions.NotFoundException:
+        st.error("O post não existe ou foi removido (Erro 404). Por favor, verifique a URL.")
+        return None
+    except instaloader.exceptions.TooManyRequestsException:
+        st.error("Muitas requisições! O Instagram bloqueou temporariamente o acesso. Tente novamente mais tarde.")
+        return None
     except Exception as e:
         st.error(f"Ocorreu um erro inesperado ao baixar o vídeo: {e}")
-        st.info("Isso pode ocorrer devido a limites de taxa do Instagram ou a um post privado.")
+        st.info("Isso pode ocorrer devido a um post privado ou outro bloqueio do Instagram.")
         return None
 
 def get_video_analysis(file_path):
