@@ -4,7 +4,7 @@ import os
 import re
 import datetime
 import base64
-import requests # Importação para fazer requisições HTTP à API Gemini
+import requests
 
 # --- Configurações Iniciais ---
 DOWNLOAD_DIR = "instagram_downloads"
@@ -86,10 +86,14 @@ def get_video_analysis(file_path):
 
         st.info("Realizando análise de IA com Gemini... Isso pode levar um tempo.")
 
-        # --- LÓGICA DA API KEY MODIFICADA ---
-        # Prioriza a variável de ambiente, depois Streamlit Secrets.
-        api_key = os.environ.get("GEMINI_API_KEY") or st.secrets.get("gemini_api_key")
-
+        # --- LÓGICA DA API KEY CORRIGIDA ---
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            try:
+                api_key = st.secrets.get("gemini_api_key")
+            except st.errors.StreamlitAPIException:
+                api_key = None
+        
         if not api_key:
             st.error("Chave da API Gemini não configurada.")
             st.warning(
@@ -100,8 +104,8 @@ def get_video_analysis(file_path):
             analysis_results["Análise de IA"] = "Chave da API Gemini não configurada."
             return analysis_results
 
-        if file_size_bytes > 20 * 1024 * 1024: # 20 MB
-            st.warning("O vídeo é muito grande para análise inline com a API Gemini (limite ~20MB). A análise de IA pode falhar.")
+        if file_size_bytes > 20 * 1024 * 1024:
+            st.warning("O vídeo é muito grande para análise inline com a API Gemini (limite ~20MB).")
             analysis_results["Análise de IA"] = "Vídeo muito grande para análise inline com Gemini."
             return analysis_results
 
@@ -111,17 +115,12 @@ def get_video_analysis(file_path):
         mime_type = "video/mp4"
         if file_path.lower().endswith(".mov"):
             mime_type = "video/quicktime"
-        # Adicione outros mime types se necessário
 
         prompt_parts = [
             {"text": """
-              #### *Instruções Gerais* Você é um *analista especialista em compliance eleitoral e comunicação pública no Brasil...
-              
+              #### *Instruções Gerais* Você é um *analista especialista...
               [O PROMPT DETALHADO FOI OCULTADO PARA BREVIDADE]
-              
-              ---### *7. Resumo*
-              - *Sempre* forneça uma análise clara e objetiva, com base nas leis brasileiras. 
-              ."""},
+              """},
             {
                 "inlineData": {
                     "mimeType": mime_type,
@@ -132,16 +131,15 @@ def get_video_analysis(file_path):
 
         api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
         payload = {"contents": [{"role": "user", "parts": prompt_parts}]}
-
         response = requests.post(api_url, headers={'Content-Type': 'application/json'}, json=payload)
         response.raise_for_status()
         result = response.json()
 
-        if result.get("candidates") and result["candidates"][0].get("content") and result["candidates"][0]["content"].get("parts"):
+        if result.get("candidates"):
             ai_analysis_text = result["candidates"][0]["content"]["parts"][0]["text"]
             analysis_results["Análise de IA"] = ai_analysis_text
         else:
-            analysis_results["Análise de IA"] = "Não foi possível obter a análise da IA. Resposta inesperada da API."
+            analysis_results["Análise de IA"] = "Não foi possível obter a análise da IA."
             st.warning(f"Resposta da API Gemini inesperada: {result}")
 
     except Exception as e:
@@ -176,12 +174,35 @@ if not st.session_state['logged_in']:
     st.title("Bem-vindo ao Cypher's Video Analyser")
     st.subheader("Por favor, faça login para continuar.")
 
+    # ###################### INÍCIO DA CORREÇÃO ######################
+    # Lógica segura para obter credenciais em qualquer ambiente
+    
+    default_user = "riquelme"
+    default_pass = "cypherpassword"
+
+    # 1. Tenta pegar das variáveis de ambiente (ideal para Render, Heroku, etc.)
+    CORRECT_USERNAME = os.environ.get("APP_USER")
+    CORRECT_PASSWORD = os.environ.get("APP_PASSWORD")
+
+    # 2. Se não encontrar, tenta pegar dos segredos do Streamlit (para Streamlit Cloud)
+    # O bloco try/except evita o erro 'StreamlitSecretNotFoundError'
+    if not CORRECT_USERNAME:
+        try:
+            CORRECT_USERNAME = st.secrets.get("app_user")
+            CORRECT_PASSWORD = st.secrets.get("app_password")
+        except (st.errors.StreamlitAPIException, AttributeError):
+            # Se st.secrets não existir ou falhar, ignora e usa o padrão
+            pass
+
+    # 3. Se nada funcionar, usa os valores padrão definidos no código
+    if not CORRECT_USERNAME:
+        CORRECT_USERNAME = default_user
+        CORRECT_PASSWORD = default_pass
+    
+    # ####################### FIM DA CORREÇÃO ########################
+
     username = st.text_input("Usuário:")
     password = st.text_input("Senha:", type="password")
-
-    # Credenciais (use um método mais seguro em produção)
-    CORRECT_USERNAME = os.environ.get("APP_USER") or st.secrets.get("app_user", "riquelme")
-    CORRECT_PASSWORD = os.environ.get("APP_PASSWORD") or st.secrets.get("app_password", "cypherpassword")
 
     if st.button("Entrar"):
         if username == CORRECT_USERNAME and password == CORRECT_PASSWORD:
@@ -193,7 +214,7 @@ if not st.session_state['logged_in']:
 else:
     # --- App Principal ---
     st.title("🤖 Cypher's Instagram Video Downloader e Analisador")
-    st.markdown(f"Seja bem-vindo, {st.session_state.get('username', 'Riquelme')}! Use este app para baixar e analisar vídeos do Instagram.")
+    st.markdown("Seja bem-vindo, Riquelme! Use este app para baixar e analisar vídeos do Instagram.")
 
     if st.sidebar.button("Sair"):
         st.session_state['logged_in'] = False
@@ -232,11 +253,35 @@ else:
                         with st.spinner(f"Analisando {selected_video_name} com IA..."):
                             analysis_results = get_video_analysis(selected_video_path)
                             if analysis_results:
-                                # Processamento e exibição dos resultados...
-                                # [CÓDIGO DE EXIBIÇÃO OCULTADO PARA BREVIDADE]
+                                analysis_text = f"--- Análise de: {analysis_results.get('Nome do Arquivo', 'N/A')} ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ---\n"
+                                analysis_text += "**Análise Básica:**\n"
+                                for key, value in analysis_results.items():
+                                    if key not in ["Análise de IA", "Erro", "Caminho do Arquivo", "Nome do Arquivo"]:
+                                        analysis_text += f"- {key}: {value}\n"
+                                if "Análise de IA" in analysis_results:
+                                    analysis_text += f"\n**Análise de IA (Gemini):**\n{analysis_results['Análise de IA']}\n"
+                                
+                                st.session_state['analysis_history'].insert(0, analysis_text)
                                 st.success("Análise concluída!")
                                 st.rerun()
 
+        st.subheader("Histórico de Análises")
+        if st.session_state['analysis_history']:
+            st.text_area("Histórico:", value="".join(st.session_state['analysis_history']), height=300, key="analysis_history_display")
+        else:
+            st.info("O histórico de análises está vazio.")
+
     with tab3:
         st.header("Vídeos Baixados")
-        # [CÓDIGO DE EXIBIÇÃO OCULTADO PARA BREVIDADE]
+        if not st.session_state['downloaded_videos']:
+            st.info("Nenhum vídeo baixado ainda.")
+        else:
+            st.write(f"Total de vídeos: {len(st.session_state['downloaded_videos'])}")
+            for i, video_path in enumerate(st.session_state['downloaded_videos']):
+                video_name = os.path.basename(video_path)
+                try:
+                    file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
+                    st.markdown(f"**{i+1}. {video_name}** ({file_size_mb:.2f} MB)")
+                    st.video(video_path)
+                except Exception as e:
+                    st.warning(f"Erro ao carregar o vídeo {video_name}: {e}")
