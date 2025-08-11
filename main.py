@@ -87,19 +87,7 @@ def download_instagram_video(url):
             st.error("Não foi possível encontrar o arquivo de vídeo baixado.")
             return None
 
-    except instaloader.exceptions.PrivateProfileNotFollowedException:
-        st.error("Este é um perfil privado e você não o segue. O Instaloader precisa estar logado na sua conta para baixar.")
-        return None
-    except instaloader.exceptions.NotFoundException:
-        st.error("O post não existe ou foi removido (Erro 404). Por favor, verifique a URL.")
-        return None
-    except instaloader.exceptions.TooManyRequestsException:
-        st.error("Muitas requisições! O Instagram bloqueou temporariamente o acesso. Tente novamente mais tarde.")
-        return None
-    except Exception as e:
-        st.error(f"Ocorreu um erro inesperado ao baixar o vídeo: {e}")
-        st.info("Isso pode ocorrer devido a um post privado ou outro bloqueio do Instagram.")
-        return None
+    
 
 def get_video_analysis(file_path):
     """
