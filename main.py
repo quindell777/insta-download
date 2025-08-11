@@ -64,12 +64,17 @@ def download_instagram_video(url):
     except instaloader.exceptions.PrivateProfileNotFollowedException:
         st.error("Este é um perfil privado e você não o segue. O Instaloader precisa de credenciais para baixar de perfis privados.")
         return None
-    except instaloader.exceptions.PostNotExistsException:
-        st.error("O post não existe ou foi removido.")
+    
+    # ###################### INÍCIO DA CORREÇÃO ######################
+    # Substituído PostNotExistsException pela exceção correta: NotFoundException
+    except instaloader.exceptions.NotFoundException:
+        st.error("O post não existe ou foi removido (Erro 404). Por favor, verifique a URL.")
         return None
+    # ####################### FIM DA CORREÇÃO ########################
+    
     except Exception as e:
-        st.error(f"Ocorreu um erro ao baixar o vídeo: {e}")
-        st.info("Para baixar de perfis privados ou contornar limites de taxa, você pode precisar configurar o login no Instaloader.")
+        st.error(f"Ocorreu um erro inesperado ao baixar o vídeo: {e}")
+        st.info("Isso pode ocorrer devido a limites de taxa do Instagram ou a um post privado.")
         return None
 
 def get_video_analysis(file_path):
@@ -86,12 +91,11 @@ def get_video_analysis(file_path):
 
         st.info("Realizando análise de IA com Gemini... Isso pode levar um tempo.")
 
-        # --- LÓGICA DA API KEY CORRIGIDA ---
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             try:
                 api_key = st.secrets.get("gemini_api_key")
-            except st.errors.StreamlitAPIException:
+            except (st.errors.StreamlitAPIException, AttributeError):
                 api_key = None
         
         if not api_key:
@@ -173,34 +177,24 @@ st.set_page_config(page_title="Cypher's Video Analyser", layout="wide")
 if not st.session_state['logged_in']:
     st.title("Bem-vindo ao Cypher's Video Analyser")
     st.subheader("Por favor, faça login para continuar.")
-
-    # ###################### INÍCIO DA CORREÇÃO ######################
-    # Lógica segura para obter credenciais em qualquer ambiente
     
     default_user = "riquelme"
     default_pass = "cypherpassword"
 
-    # 1. Tenta pegar das variáveis de ambiente (ideal para Render, Heroku, etc.)
     CORRECT_USERNAME = os.environ.get("APP_USER")
     CORRECT_PASSWORD = os.environ.get("APP_PASSWORD")
 
-    # 2. Se não encontrar, tenta pegar dos segredos do Streamlit (para Streamlit Cloud)
-    # O bloco try/except evita o erro 'StreamlitSecretNotFoundError'
     if not CORRECT_USERNAME:
         try:
             CORRECT_USERNAME = st.secrets.get("app_user")
             CORRECT_PASSWORD = st.secrets.get("app_password")
         except (st.errors.StreamlitAPIException, AttributeError):
-            # Se st.secrets não existir ou falhar, ignora e usa o padrão
             pass
 
-    # 3. Se nada funcionar, usa os valores padrão definidos no código
     if not CORRECT_USERNAME:
         CORRECT_USERNAME = default_user
         CORRECT_PASSWORD = default_pass
     
-    # ####################### FIM DA CORREÇÃO ########################
-
     username = st.text_input("Usuário:")
     password = st.text_input("Senha:", type="password")
 
