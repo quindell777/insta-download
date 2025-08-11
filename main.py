@@ -225,7 +225,7 @@ def download_instagram_video(url, instaloader_instance):
 
     except instaloader.exceptions.PrivateProfileNotFollowedException:
         st.error("Perfil privado e você não o segue. O login no Instagram é necessário.")
-    except instaloader.exceptions.NotFoundException:
+    except instaloader.exceptions.PostNotExistException:
         st.error("Post não encontrado (Erro 404). Verifique a URL.")
     except instaloader.exceptions.TooManyRequestsException:
         st.error("Muitas requisições! O Instagram bloqueou temporariamente o acesso. Tente mais tarde.")
